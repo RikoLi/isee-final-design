@@ -1,6 +1,41 @@
 # ISEE Final Design
 
-2020 ZJU ISEE final design, *Image Recognition and Location of Indoor Fire Hydrant*.
+2016级浙江大学信息工程毕业设计：*室内消防栓的图像识别与定位*。
 
-## Approaches
+## Ideas
 
+**11.15**
+
+- 算法综述？写需要的算法以及最后选用的？
+- 做成什么样子，最后产出一个系统化工具？半自动or自动？
+  - 确定一个成果构想
+- 论文里面写什么，怎么写？
+- more...
+
+### 消防箱开关检测
+
+早期提出的方案：
+
+1. 预处理
+2. 基于颜色通道ROI分离，其他ROI提取方法？
+3. 二值化，阈值选取方法？
+4. 形态学处理
+5. 边缘提取，区域选择
+
+问题：
+
+- 箱体开关目标小，检测困难 -> 小目标检测算法？
+- 鲁棒性差，受光照影响大
+- more...
+
+### 水泵接口检测
+
+定位算法：
+
+- 基于传统检测算法，如Hough变换
+- 基于改进的传统算法
+  - 基于c++和MATLAB：Arc-support Line Segments Revisited: An Efficient and High-quality Ellipse Detection
+- 用基于分割的方法定位接口？
+  - 基于学习的方法，需要大量训练数据，从哪里来？
+- 使用tracking算法加以辅助定位
+  - more...
