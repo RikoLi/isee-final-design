@@ -104,36 +104,39 @@ class LightProcess(Preprocess):
     '''
     Child class for light preprocessing.
     '''
-    def _equalizeHist(self, img):
+    def homomorphicFilter(self, img, rh=1.5, rl=0.9, c=1, n=1, m=3, d0=None):
         '''
-        Canonical histogram equalization.\n
+        Homomorphic filtering.\n
         img: np.array\n
-        return: np.array
+        rh: float, upper bound\n
+        rl: float, lower bound\n
+        c: float, slope factor, rl < c < rh\n
+        n: int, dynamic factor\n
+        m: int, dynamic factor\n
+        d0: float, cut frequency, default: 0.5 * MAX(d)\n
+        return: np.array, single-channel
         '''
-        if len(img.shape) == 3:
-            b, g, r = cv.split(img)
-            b = cv.equalizeHist(b)
-            g = cv.equalizeHist(g)
-            r = cv.equalizeHist(r)
-            img = cv.merge([b,g,r])
-        elif len(img.shape) == 2:
-            img = cv.equalizeHist(img)
-        else:
-            print('Wrong color channel numbers!')
-        return img
-
-    def _equalizeFAGC(self, img):
-        '''
-        Fast and Adaptive Gray-level Correction.\n
-        img: np.array\n
-        return: np.array
-        '''
-        pass
-
-    def fix(self):
-        pass
+        eps = 1e-16
+        freq = np.fft.fft2(np.log(img+eps))
+        freq = np.fft.fftshift(freq)
+        # Homomorphic filter design
+        g = np.zeros(freq.shape)
+        g = np.complex64(g) # convert to complex type
+        rows, cols = freq.shape
+        if d0 == None:
+            d0 = 0.5 * (((rows/2)**2 + (cols/2)**2) ** 0.5)
+        for x in range(cols):
+            for y in range(rows):
+                numerator = rh - rl
+                denominator = 1 + c * (d0**n / (eps + ((y - rows/2)**2 + (x - cols/2)**2)**0.5)**m) ** 2
+                h = numerator / denominator + rl
+                g[y,x] = h * freq[y,x]
+        g = np.fft.ifftshift(g)
+        g = np.abs(np.fft.ifft2(g))
+        g = np.exp(g)
+        return np.uint8(g)
 
 # Test code
 if __name__ == "__main__":
-    img1 = cv.imread('../../images/IMG_7958.JPG', cv.IMREAD_COLOR)
-    img2 = cv.imread('../../images/IMG_7966.JPG', cv.IMREAD_COLOR)
+    img = cv.imread('../../images/dark_valve.JPG', 1)
+   
