@@ -8,7 +8,7 @@ class Preprocess:
     '''
     Parent preprocess class for input images.
     '''
-    def gaussianFilter(self, img, win_size=(5,5), sigma=5):
+    def gaussianFilter(self, img, win_size=(3,3), sigma=5):
         '''
         Gaussian filtering.\n
         img: np.array\n
@@ -30,7 +30,7 @@ class Preprocess:
         '''
         Get features from give image.\n
         img: np.array\n
-        feature_type: int, 0:ORB, 1:SIFT\n
+        feature_type: int, 0:ORB, 1:SIFT, 2:FAST+ORB descriptor\n
         return: keypoints, descriptor
         '''
         img = self.gaussianFilter(img)
@@ -44,8 +44,15 @@ class Preprocess:
             sift = cv.xfeatures2d.SIFT_create()
             kp, des = sift.detectAndCompute(img, None)
             return kp, des
+        elif feature_type == 2:
+            # FAST corners + SIFT descriptors
+            fast = cv.FastFeatureDetector_create()
+            sift = cv.xfeatures2d.SIFT_create()
+            kp = fast.detect(img)
+            kp, des = sift.compute(img, kp)
+            return kp, des
         else:
-            print('Wrong feature type code! It should be 0 or 1!')
+            print('Wrong feature type code!')
             return None
     
     def _testDrawFeatures(self, img):
@@ -88,17 +95,22 @@ class AngleProcess(Preprocess):
             print( "Not enough matches are found - {}/{}".format(len(good), MIN_MATCH_COUNT) )
             return None
 
-    def fix(self, img, standard_img):
-        feature_type = 0 # Default feature: ORB
-        img = self.gaussianFilter(img)
-        standard_img = self.gaussianFilter(standard_img)
-        kp, des = super().getFeature(img, feature_type)
-        s_kp, s_des = super().getFeature(standard_img, feature_type)
+    def fix(self, img, standard_img, feature_type=0):
+        # Smoothing
+        gimg = cv.cvtColor(img, cv.COLOR_BGR2GRAY)
+        gstd = cv.cvtColor(standard_img, cv.COLOR_BGR2GRAY)
+        gimg = self.gaussianFilter(gimg, (3, 3), 5)
+        gstd = self.gaussianFilter(gstd, (3, 3), 5)
+
+        # Get features
+        kp, des = super().getFeature(gimg, feature_type)
+        s_kp, s_des = super().getFeature(gstd, feature_type)
+
         # Matching
         H = self._match(kp, s_kp, des, s_des)
         img = cv.warpPerspective(img, H, (img.shape[1], img.shape[0]))
-        cv.imwrite('angle_fixed.png', img)
         print('Angle fixed.')
+        return img
 
 class LightProcess(Preprocess):
     '''
@@ -138,5 +150,15 @@ class LightProcess(Preprocess):
 
 # Test code
 if __name__ == "__main__":
-    img = cv.imread('../../images/dark_valve.JPG', 1)
-   
+    standard_img = cv.imread('../../images/original/2.26_box_standard2.JPG', 1)
+    # img = cv.imread('../../images/original/2.26_box_left.JPG', 1)
+    # img = cv.imread('../../images/original/2.26_box_right.JPG', 1)
+    # img = cv.imread('../../images/original/2.26_box_right2.JPG', 1)
+    img = cv.imread('../../images/original/2.26_box_leftup.JPG', 1)
+
+    p = AngleProcess()
+    out = p.fix(img, standard_img, 2)
+    cv.imwrite('2.26_fixed_box_leftup.png', out)
+    
+    # cv.waitKey()
+    # cv.destroyAllWindows()
