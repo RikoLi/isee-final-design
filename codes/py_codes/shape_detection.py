@@ -110,7 +110,7 @@ class ShapeDetector:
         return dst
 
     def detectSwitchROI(self, img,\
-        lower_bound=np.array([110, 0, 0]),\
+        lower_bound=np.array([110, 55, 5]),\
         upper_bound=np.array([130, 255, 255])):
         '''
         Detect switch ROI in an image.\n
@@ -125,13 +125,10 @@ class ShapeDetector:
         inv_img = cv.merge([r,g,b])
         hsv = cv.cvtColor(inv_img, cv.COLOR_BGR2HSV)
 
-        # Crop for color mask and find contours
+        # Crop for color mask
         mask = cv.inRange(hsv, lower_bound, upper_bound)
-        kernel = np.ones((3, 3), np.uint8)
-        mask = cv.morphologyEx(mask, cv.MORPH_OPEN, kernel)
-        mask = cv.morphologyEx(mask, cv.MORPH_ERODE, kernel)
 
-        # Make intensity mask and crop for ROI
+        # Crop for ROI
         h, s, v = cv.split(hsv)
         v = cv.bilateralFilter(v, 0, 15, 15)
         _, v = cv.threshold(v, 0, 255, cv.THRESH_OTSU)
@@ -140,15 +137,16 @@ class ShapeDetector:
         points = self.getPosForMask(v)
         xs, ys, dx, dy = cv.boundingRect(points)
         roi_mask = mask[ys:ys+dy, xs:xs+dx]
+        kernel = np.ones((3, 3), np.uint8)
+        roi_mask = cv.morphologyEx(roi_mask, cv.MORPH_CLOSE, kernel) # Trimming
         roi = img[ys:ys+dy, xs:xs+dx]
-        # cv.imshow('roi', roi)
 
         _, contours, _ = cv.findContours(roi_mask, cv.RETR_TREE, cv.CHAIN_APPROX_SIMPLE)
         # centers = []
         boxes = []
 
         for i in range(len(contours)):
-            roi = cv.drawContours(roi, contours, i, (0,0,255), 1)
+            # roi = cv.drawContours(roi, contours, i, (0,0,255), 1)
             points = [x[0] for x in contours[i]]
             xs, ys, dx, dy = cv.boundingRect(np.array(points))
             # centers.append(center)
@@ -184,6 +182,20 @@ class ShapeDetector:
             is_normal = True
         return is_normal
 
+    def _checkBoxSize(self, width_height, threshold=9):
+        '''
+        Check whether a bounding box satisfies a given size computed by width and height.\n
+        width_height: tuple, bounding box parameters, like (w, h),\
+            that means the width and height of the box\n
+        threshold: int, threshold under which a box is considered abnormal, in pixel\n
+        return: bool, whether the bounding box satisfies the size or not
+        '''
+        is_normal = False
+        w, h = width_height
+        if w * h > threshold:
+            is_normal = True
+        return is_normal
+
     def checkBoxes(self, boxes):
         '''
         Check a list of bounding boxes to pick out the best-matched bounding box of ROI.\n
@@ -194,6 +206,7 @@ class ShapeDetector:
 
         # Width-height ratio filtering
         realBoxes = [box for box in boxes if self._checkBoxRatio(box[2:], 1.0, 0.2)]
+        realBoxes = [box for box in realBoxes if self._checkBoxSize(box[2:], 9)]
 
         # maybe more ...
         return realBoxes
@@ -214,8 +227,8 @@ class ShapeDetector:
 # for test
 if __name__ == "__main__":
     # img = cv.imread('../../images/fixed/2.26_fixed_box_left.png', 1)
-    # img = cv.imread('../../images/fixed/2.26_fixed_box_leftup.png', 1)
-    img = cv.imread('../../images/fixed/2.26_fixed_box_right.png', 1)
+    img = cv.imread('../../images/fixed/2.26_fixed_box_leftup.png', 1)
+    # img = cv.imread('../../images/fixed/2.26_fixed_box_right.png', 1)
     # img = cv.imread('../../images/original/IMG_7966.JPG', 1)
     # img = cv.imread('../../images/original/IMG_7958.JPG', 1)
     
