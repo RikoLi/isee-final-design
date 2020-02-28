@@ -97,33 +97,53 @@ class ShapeDetector:
         return labels, centers
 
     def cropByHue(self, img):
-        mask = cv.inRange(img, 150, 180) # Crop for red zone in hue
-        dst = cv.bitwise_and(mask, img)
+        '''
+        ### Now deprecated! ###
+        '''
+        lower_bound = 5
+        upper_bound = 175
+        inv_mask = cv.inRange(img, lower_bound, upper_bound)
+        red_mask = cv.bitwise_not(inv_mask) # Crop for red zone in hue
+        dst = cv.bitwise_and(red_mask, img)
         dst = cv.GaussianBlur(dst, (5,5), 10)
         _, dst = cv.threshold(dst, 0, 255, cv.THRESH_OTSU)
         return dst
-    
-    def detectSwitchROI(self, img):
+
+    def detectSwitchROI(self, img,\
+        lower_bound=np.array([110, 5, 5]),\
+        upper_bound=np.array([130, 255, 255])):
         '''
         Detect switch ROI in an image.\n
-        :param img: np.array, input image\n
-        :return: np.array, list, ROI with bounding box and coordinates of possible ROI centers
+        img: np.array, input image\n
+        lower_bound: np.array, lower bound for HSV color cut\n
+        upper_bound: np.array, upper bound for HSV color cut\n
+        return: np.array, list, ROI image with bounding box and\
+            ROI bounding boxes, each is a tuple like (x, y, dx, dy)
         '''
-        hsv = cv.cvtColor(img, cv.COLOR_BGR2HSV)
+        # Replace R and B channel
+        b,g,r = cv.split(img)
+        inv_img = cv.merge([r,g,b])
+        hsv = cv.cvtColor(inv_img, cv.COLOR_BGR2HSV)
+
+        # Make intensity mask and crop for ROI
         h, s, v = cv.split(hsv)
         v = cv.bilateralFilter(v, 0, 15, 15)
         _, v = cv.threshold(v, 0, 255, cv.THRESH_OTSU)
         kernel = np.ones((5, 5), np.uint8)
         v = cv.morphologyEx(v, cv.MORPH_ERODE, kernel)
+        cv.imshow('intensity mask', v)
         points = self.getPosForMask(v)
         xs, ys, dx, dy = cv.boundingRect(points)
-        roi = h[ys:ys+dy, xs:xs+dx]
-        crop = self.cropByHue(roi)
+        roi = hsv[ys:ys+dy, xs:xs+dx, :]
+
+        # Crop for color mask and find contours
+        mask = cv.inRange(roi, lower_bound, upper_bound)
         kernel = np.ones((7, 7), np.uint8)
-        crop = cv.morphologyEx(crop, cv.MORPH_CLOSE, kernel)
-        crop = cv.morphologyEx(crop, cv.MORPH_OPEN, kernel)
-        _, contours, _ = cv.findContours(crop, cv.RETR_TREE, cv.CHAIN_APPROX_SIMPLE)
-        centers = []
+        mask = cv.morphologyEx(mask, cv.MORPH_CLOSE, kernel)
+        mask = cv.morphologyEx(mask, cv.MORPH_OPEN, kernel)
+        _, contours, _ = cv.findContours(mask, cv.RETR_TREE, cv.CHAIN_APPROX_SIMPLE)
+        # centers = []
+        boxes = []
 
         for i in range(len(contours)):
             # img = cv.drawContours(img, contours, i, (0,0,255), 1)
@@ -132,22 +152,74 @@ class ShapeDetector:
             img = cv.rectangle(img, (xs, ys), (xs+dx, ys+dy), (0, 255, 0), 1)
             center = [xs + int(dx/2), ys + int(dy/2)]
             img = cv.circle(img, tuple(center), 3, (0, 255, 0), thickness=cv.FILLED)
-            centers.append(center)
-        return img, centers
+            # centers.append(center)
+            boxes.append((xs, ys, dx, dy))
+        return img, boxes
+
+    def spacialDiff(self, img, dx=1, dy=1):
+        '''
+        Get spacial difference image with offset dx and dy.
+        '''
+        H = np.zeros((2, 3))
+        H[0, 0] = 1
+        H[0, 2] = dx
+        H[1, 1] = 1
+        H[1, 2] = dy
+        translated = cv.warpAffine(img, H, (img.shape[1], img.shape[0]))
+        img = translated - img
+        img = cv.normalize(img, None, 0, 255, cv.NORM_MINMAX)
+        return np.uint8(img)
+
+    def _checkBoxRatio(self, width_height, ratio, err_eps=0.1):
+        '''
+        Check whether a bounding box satisties a given width-height ratio.\n
+        width_height: tuple, bounding box parameters, like (w, h),\
+            that means the width and height of the box\n
+        ratio: float, width-height ratio, computed by: ratio = width / heigth\n
+        err_eps: float, error threshold, under which is concerned as non-error\n
+        return: bool, whether the bounding box satisfies the ratio or not
+        '''
+        isNormal = False
+        w, h = width_height
+        if abs(w / h - ratio) < err_eps:
+            isNormal = True
+        return isNormal
+
+    def checkBoxes(self, boxes):
+        '''
+        Check a list of bounding boxes to pick out the best-matched bounding box of ROI.\n
+        boxes: list, list of bounding boxes, like [(x,y,dx,dy), ...]
+        return: tuple, the best-matched bounding box of ROI, like (x, y, dx, dy)
+        '''
+        realBox = None
+
+        # Width-height ratio filtering
+        
+
+        # maybe more ...
+        return realBox
 
 # for test
 if __name__ == "__main__":
-    # img = cv.imread('../../images/IMG_7966.JPG', 1)
-    img = cv.imread('../../images/IMG_7958.JPG', 1)
-    # img = cv.imread('../../images/IMG_7967.JPG', 1)
-    rows = img.shape[0]#1024
-    cols = img.shape[1]#768
+    # img = cv.imread('../../images/fixed/2.26_fixed_box_left.png', 1)
+    img = cv.imread('../../images/original/IMG_7966.JPG', 1)
+    # img = cv.imread('../../images/original/IMG_7958.JPG', 1)
+    
+    rows = 1024#1024
+    cols = 768#768
     new_size = (cols, rows)
     img = cv.resize(img, new_size)
     img = img[int(rows/3):int(rows/3*2)+1, :int(cols/4)]
-    hsv = cv.cvtColor(img, cv.COLOR_BGR2HSV)
+    # hsv = cv.cvtColor(img, cv.COLOR_BGR2HSV)
 
     p = ShapeDetector()
-    out, centers = p.detectSwitchROI(img)
-    print(centers)
-    cv.imwrite('result2_original_size.png', img)
+    out, boxes = p.detectSwitchROI(img)
+
+    print(boxes)
+
+    # cv.imshow('img_inv', img_inv)
+    # cv.imshow('crop', crop)
+    # cv.imshow('value', v)
+    cv.imshow('out', out)
+    cv.waitKey()
+    cv.destroyAllWindows()
