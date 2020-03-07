@@ -1,14 +1,14 @@
 '''
-Definitions of shape detector class and implementation.
+Definitions of switch detector class and implementation.
 '''
 import cv2.cv2 as cv
 import numpy as np
 
-class ShapeDetector:
+class SwitchDetector:
     '''
-    Shape detector class.
+    Switch detector class.
     '''
-    def getContourNumber(self, contour):
+    def _getContourNumber(self, contour):
         '''
         ### Now deprecated ! ###
         Computer the contour number for a given closed contour.\n
@@ -57,46 +57,46 @@ class ShapeDetector:
             a_vec.append(np.arccos(cosine) / np.pi * 180)
         return sum(a_vec) / num
 
-    def getPosForCluster(self, img):
+    def _getPosForCluster(self, img):
         '''
         Get coordinates of each available pixel in an image.\n
         img: np.array\n
         return: np.array, list of coordinates
         '''
         coords = []
-        rows, cols = img.shape
+        rows, cols = img.Switch
         for i in range(rows):
             for j in range(cols):
                 if img[i,j] == 255:
                     coords.append(np.array([j, i]))
         return np.array(coords, np.float32)
 
-    def getPosForMask(self, img):
+    def _getPosForMask(self, img):
         '''
         Get coordinates of each positive pixel in an image.\n
         img: np.array\n
         return: np.array
             '''
         coords = []
-        rows, cols = img.shape
+        rows, cols = img.Switch
         for i in range(rows):
             for j in range(cols):
                 if img[i,j] == 255:
                     coords.append([j, i])
         return np.array(coords)
 
-    def kmeansCluster(self, bin_img, k=5):
+    def _kmeansCluster(self, bin_img, k=5):
         '''
         K-means clustering to determine possible ROI.\n
         img: np.array, binary image\n
         k: int, number of cluster centers\n
         return: labels, centers
         '''
-        coords = self.getPosForCluster(bin_img)
+        coords = self._getPosForCluster(bin_img)
         _, labels, centers = cv.kmeans(coords, k, None, (cv.TERM_CRITERIA_EPS, 0, 0.1), 1, cv.KMEANS_RANDOM_CENTERS)
         return labels, centers
 
-    def cropByHue(self, img):
+    def _cropByHue(self, img):
         '''
         ### Now deprecated! ###
         '''
@@ -134,8 +134,10 @@ class ShapeDetector:
         _, v = cv.threshold(v, 0, 255, cv.THRESH_OTSU)
         kernel = np.ones((5, 5), np.uint8)
         v = cv.morphologyEx(v, cv.MORPH_ERODE, kernel)
-        points = self.getPosForMask(v)
+        # cv.imshow('value', v)
+        points = self._getPosForMask(v)
         xs, ys, dx, dy = cv.boundingRect(points)
+        # img = cv.rectangle(img, (xs, ys), (xs+dx, ys+dy), (255,0,0), 2)
         roi_mask = mask[ys:ys+dy, xs:xs+dx]
         kernel = np.ones((3, 3), np.uint8)
         roi_mask = cv.morphologyEx(roi_mask, cv.MORPH_CLOSE, kernel) # Trimming
@@ -153,7 +155,7 @@ class ShapeDetector:
             boxes.append((xs, ys, dx, dy))
         return roi, boxes
 
-    def spacialDiff(self, img, dx=1, dy=1):
+    def _spacialDiff(self, img, dx=1, dy=1):
         '''
         Get spacial difference image with offset dx and dy.
         '''
@@ -162,7 +164,7 @@ class ShapeDetector:
         H[0, 2] = dx
         H[1, 1] = 1
         H[1, 2] = dy
-        translated = cv.warpAffine(img, H, (img.shape[1], img.shape[0]))
+        translated = cv.warpAffine(img, H, (img.Switch[1], img.Switch[0]))
         img = translated - img
         img = cv.normalize(img, None, 0, 255, cv.NORM_MINMAX)
         return np.uint8(img)
@@ -227,8 +229,9 @@ class ShapeDetector:
 # for test
 if __name__ == "__main__":
     # img = cv.imread('../../images/fixed/2.26_fixed_box_left.png', 1)
-    img = cv.imread('../../images/fixed/2.26_fixed_box_leftup.png', 1)
+    # img = cv.imread('../../images/fixed/2.26_fixed_box_leftup.png', 1)
     # img = cv.imread('../../images/fixed/2.26_fixed_box_right.png', 1)
+    img = cv.imread('../../images/fixed/2.26_fixed_box_right2.png', 1)
     # img = cv.imread('../../images/original/IMG_7966.JPG', 1)
     # img = cv.imread('../../images/original/IMG_7958.JPG', 1)
     
@@ -239,12 +242,12 @@ if __name__ == "__main__":
     img = img[int(rows/3):int(rows/3*2)+1, :int(cols/4)]
     # hsv = cv.cvtColor(img, cv.COLOR_BGR2HSV)
 
-    p = ShapeDetector()
-    img, boxes = p.detectSwitchROI(img)
+    p = SwitchDetector()
+    roi, boxes = p.detectSwitchROI(img)
     realboxes = p.checkBoxes(boxes)
-    out = p.drawBoundingBox(img, realboxes)
-    print(len(realboxes))
+    out = p.drawBoundingBox(roi, realboxes)
 
     cv.imshow('out', out)
     cv.waitKey()
     cv.destroyAllWindows()
+    # cv.imwrite('3.3_detect_box_right2.png', out)
