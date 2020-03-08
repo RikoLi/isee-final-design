@@ -6,8 +6,22 @@ import numpy as np
 
 class SwitchDetector:
     '''
-    Switch detector class.
+    Create a switch detector.\n
+    @min_area:
+        int, minimum contour area that will be considered as a proposal ROI
+    @wh_ratio:
+        float, target standard width-height ratio
+    @ratio_eps:
+        float, maximum error of width-height ratio
+    @return:
+        SwitchDetector
     '''
+    def __init__(self, min_area=50, wh_ratio=1.0, ratio_eps=0.6):
+        self.min_area = min_area
+        self.ratio_eps = ratio_eps
+        self.wh_ratio = wh_ratio
+        self.ratio_eps = ratio_eps
+
     def _getContourNumber(self, contour):
         '''
         ### Now deprecated ! ###
@@ -59,6 +73,7 @@ class SwitchDetector:
 
     def _getPosForCluster(self, img):
         '''
+        ### Now deprecated ! ###
         Get coordinates of each available pixel in an image.\n
         img: np.array\n
         return: np.array, list of coordinates
@@ -74,9 +89,11 @@ class SwitchDetector:
     def _getPosForMask(self, img):
         '''
         Get coordinates of each positive pixel in an image.\n
-        img: np.array\n
-        return: np.array
-            '''
+        @img:
+            np.array, it should be a binary, single-channel image
+        @return:
+            np.array, coordinates of positive pixels
+        '''
         coords = []
         rows, cols = img.shape
         for i in range(rows):
@@ -87,6 +104,7 @@ class SwitchDetector:
 
     def _kmeansCluster(self, bin_img, k=5):
         '''
+        ### Now deprecated ! ###
         K-means clustering to determine possible ROI.\n
         img: np.array, binary image\n
         k: int, number of cluster centers\n
@@ -114,11 +132,14 @@ class SwitchDetector:
         upper_bound=np.array([130, 255, 255])):
         '''
         Detect switch ROI in an image.\n
-        img: np.array, input image\n
-        lower_bound: np.array, lower bound for HSV color cut\n
-        upper_bound: np.array, upper bound for HSV color cut\n
-        return: np.array, list, ROI image with bounding box and\
-            ROI bounding boxes, each is a tuple like (x, y, dx, dy)
+        @img:
+            np.array, input image
+        @lower_bound:
+            np.array, lower bound for HSV color cut
+        @upper_bound:
+            np.array, upper bound for HSV color cut
+        @return:
+            np.array, list, ROI image with bounding box and ROI bounding boxes, each is a tuple like (x, y, dx, dy)
         '''
         # Replace R and B channel
         blurred_img = cv.GaussianBlur(img, (5,5), 5) # Gaussian smoothing to remove noisy points
@@ -153,20 +174,21 @@ class SwitchDetector:
             # roi = cv.drawContours(roi, contours, i, (255,0,0), 1)
             points = [x[0] for x in contours[i]]
             area = cv.contourArea(contours[i]) # filter out small areas
-            if area < 50:
+            if area < self.min_area:
                 continue
             xs, ys, dx, dy = cv.boundingRect(np.array(points))
             # centers.append(center)
             boxes.append((xs, ys, dx, dy))
         
         # debug
-        cv.imshow('mask', mask)
-        cv.imshow('roi', roi)
-        cv.imshow('roi_mask', roi_mask)
+        # cv.imshow('mask', mask)
+        # cv.imshow('roi', roi)
+        # cv.imshow('roi_mask', roi_mask)
         return roi, boxes
 
     def _spacialDiff(self, img, dx=1, dy=1):
         '''
+        ### Now deprecated ! ###
         Get spacial difference image with offset dx and dy.
         '''
         H = np.zeros((2, 3))
@@ -179,46 +201,32 @@ class SwitchDetector:
         img = cv.normalize(img, None, 0, 255, cv.NORM_MINMAX)
         return np.uint8(img)
 
-    def _checkBoxRatio(self, width_height, ratio, err_eps=0.1):
+    def _checkBoxRatio(self, width_height):
         '''
         Check whether a bounding box satisties a given width-height ratio.\n
-        width_height: tuple, bounding box parameters, like (w, h),\
-            that means the width and height of the box\n
-        ratio: float, width-height ratio, computed by: ratio = width / heigth\n
-        err_eps: float, error threshold, under which is concerned as non-error\n
-        return: bool, whether the bounding box satisfies the ratio or not
+        @width_height:
+            tuple, bounding box parameters, like (w, h), that means the width and height of the box
+        @return:
+            bool, whether the box satiesfies the standard or not
         '''
         is_normal = False
         w, h = width_height
-        if abs(w / h - ratio) < err_eps:
+        if abs(w / h - self.wh_ratio) < self.ratio_eps:
             is_normal = True
         return is_normal
 
-    def _checkBoxSize(self, width_height, threshold=9):
-        '''
-        Check whether a bounding box satisfies a given size computed by width and height.\n
-        width_height: tuple, bounding box parameters, like (w, h),\
-            that means the width and height of the box\n
-        threshold: int, threshold under which a box is considered abnormal, in pixel\n
-        return: bool, whether the bounding box satisfies the size or not
-        '''
-        is_normal = False
-        w, h = width_height
-        if w * h > threshold:
-            is_normal = True
-        return is_normal
-
-    def checkBoxes(self, boxes, ratio_eps):
+    def checkBoxes(self, boxes):
         '''
         Check a list of bounding boxes to pick out the best-matched bounding box of ROI.\n
-        boxes: list, list of bounding boxes, like [(x,y,dx,dy), ...]
-        return: list, the best-matched bounding boxes of ROI, each is a tuple like (x, y, dx, dy)
+        @boxes:
+            list, list of bounding boxes, like [(x,y,dx,dy), ...]
+        @return:
+            list, the best-matched bounding boxes of ROI, each is a tuple like (x, y, dx, dy)
         '''
         realBoxes = None
 
         # Width-height ratio filtering
-        realBoxes = [box for box in boxes if self._checkBoxRatio(box[2:], 1.0, ratio_eps)]
-        realBoxes = [box for box in realBoxes if self._checkBoxSize(box[2:], 9)]
+        realBoxes = [box for box in boxes if self._checkBoxRatio(box[2:])]
 
         # maybe more ...
         return realBoxes
@@ -226,8 +234,12 @@ class SwitchDetector:
     def drawBoundingBox(self, img, boxes):
         '''
         Draw all bounding boxes on the given image.\n
-        img: np.array, input image\n
-        boxes: list, list of bounding boxes, each is a tuple like (x, y, dx, dy)
+        @img:
+            np.array, input image
+        @boxes:
+            list, list of bounding boxes, each is a tuple like (x, y, dx, dy)
+        @return:
+            np.array, image with bounding boxes
         '''
         for box in boxes:
             xs, ys, dx, dy = box
@@ -244,9 +256,9 @@ if __name__ == "__main__":
     # img = cv.imread('../../images/fixed/2.26_fixed_box_right2.png', 1)
     # img = cv.imread('../../images/original/IMG_7966.JPG', 1)
     # img = cv.imread('../../images/original/IMG_7958.JPG', 1)
-    # img = cv.imread('../../images/original/3.8_box1.jpg', 1)
+    img = cv.imread('../../images/original/3.8_box1.jpg', 1)
     # img = cv.imread('../../images/original/3.8_box2.jpg', 1)
-    img = cv.imread('../../images/original/3.8_box3.jpg', 1)
+    # img = cv.imread('../../images/original/3.8_box3.jpg', 1)
     # img = cv.imread('../../images/original/3.8_box4.jpg', 1)
     
     rows = 1024#1024
@@ -258,7 +270,7 @@ if __name__ == "__main__":
 
     p = SwitchDetector()
     roi, boxes = p.detectSwitchROI(img)
-    boxes = p.checkBoxes(boxes, 0.6)
+    boxes = p.checkBoxes(boxes)
     out = p.drawBoundingBox(roi, boxes)
 
     cv.imshow('out', out)
