@@ -64,7 +64,7 @@ class SwitchDetector:
         return: np.array, list of coordinates
         '''
         coords = []
-        rows, cols = img.Switch
+        rows, cols = img.shape
         for i in range(rows):
             for j in range(cols):
                 if img[i,j] == 255:
@@ -78,7 +78,7 @@ class SwitchDetector:
         return: np.array
             '''
         coords = []
-        rows, cols = img.Switch
+        rows, cols = img.shape
         for i in range(rows):
             for j in range(cols):
                 if img[i,j] == 255:
@@ -121,7 +121,8 @@ class SwitchDetector:
             ROI bounding boxes, each is a tuple like (x, y, dx, dy)
         '''
         # Replace R and B channel
-        b,g,r = cv.split(img)
+        blurred_img = cv.GaussianBlur(img, (5,5), 5) # Gaussian smoothing to remove noisy points
+        b,g,r = cv.split(blurred_img)
         inv_img = cv.merge([r,g,b])
         hsv = cv.cvtColor(inv_img, cv.COLOR_BGR2HSV)
 
@@ -143,16 +144,25 @@ class SwitchDetector:
         roi_mask = cv.morphologyEx(roi_mask, cv.MORPH_CLOSE, kernel) # Trimming
         roi = img[ys:ys+dy, xs:xs+dx]
 
+
         _, contours, _ = cv.findContours(roi_mask, cv.RETR_TREE, cv.CHAIN_APPROX_SIMPLE)
         # centers = []
         boxes = []
 
         for i in range(len(contours)):
-            # roi = cv.drawContours(roi, contours, i, (0,0,255), 1)
+            # roi = cv.drawContours(roi, contours, i, (255,0,0), 1)
             points = [x[0] for x in contours[i]]
+            area = cv.contourArea(contours[i]) # filter out small areas
+            if area < 50:
+                continue
             xs, ys, dx, dy = cv.boundingRect(np.array(points))
             # centers.append(center)
             boxes.append((xs, ys, dx, dy))
+        
+        # debug
+        cv.imshow('mask', mask)
+        cv.imshow('roi', roi)
+        cv.imshow('roi_mask', roi_mask)
         return roi, boxes
 
     def _spacialDiff(self, img, dx=1, dy=1):
@@ -164,7 +174,7 @@ class SwitchDetector:
         H[0, 2] = dx
         H[1, 1] = 1
         H[1, 2] = dy
-        translated = cv.warpAffine(img, H, (img.Switch[1], img.Switch[0]))
+        translated = cv.warpAffine(img, H, (img.shape[1], img.shape[0]))
         img = translated - img
         img = cv.normalize(img, None, 0, 255, cv.NORM_MINMAX)
         return np.uint8(img)
@@ -198,7 +208,7 @@ class SwitchDetector:
             is_normal = True
         return is_normal
 
-    def checkBoxes(self, boxes):
+    def checkBoxes(self, boxes, ratio_eps):
         '''
         Check a list of bounding boxes to pick out the best-matched bounding box of ROI.\n
         boxes: list, list of bounding boxes, like [(x,y,dx,dy), ...]
@@ -207,7 +217,7 @@ class SwitchDetector:
         realBoxes = None
 
         # Width-height ratio filtering
-        realBoxes = [box for box in boxes if self._checkBoxRatio(box[2:], 1.0, 0.2)]
+        realBoxes = [box for box in boxes if self._checkBoxRatio(box[2:], 1.0, ratio_eps)]
         realBoxes = [box for box in realBoxes if self._checkBoxSize(box[2:], 9)]
 
         # maybe more ...
@@ -231,9 +241,13 @@ if __name__ == "__main__":
     # img = cv.imread('../../images/fixed/2.26_fixed_box_left.png', 1)
     # img = cv.imread('../../images/fixed/2.26_fixed_box_leftup.png', 1)
     # img = cv.imread('../../images/fixed/2.26_fixed_box_right.png', 1)
-    img = cv.imread('../../images/fixed/2.26_fixed_box_right2.png', 1)
+    # img = cv.imread('../../images/fixed/2.26_fixed_box_right2.png', 1)
     # img = cv.imread('../../images/original/IMG_7966.JPG', 1)
     # img = cv.imread('../../images/original/IMG_7958.JPG', 1)
+    # img = cv.imread('../../images/original/3.8_box1.jpg', 1)
+    # img = cv.imread('../../images/original/3.8_box2.jpg', 1)
+    img = cv.imread('../../images/original/3.8_box3.jpg', 1)
+    # img = cv.imread('../../images/original/3.8_box4.jpg', 1)
     
     rows = 1024#1024
     cols = 768#768
@@ -244,8 +258,8 @@ if __name__ == "__main__":
 
     p = SwitchDetector()
     roi, boxes = p.detectSwitchROI(img)
-    realboxes = p.checkBoxes(boxes)
-    out = p.drawBoundingBox(roi, realboxes)
+    boxes = p.checkBoxes(boxes, 0.6)
+    out = p.drawBoundingBox(roi, boxes)
 
     cv.imshow('out', out)
     cv.waitKey()
