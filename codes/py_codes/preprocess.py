@@ -8,7 +8,7 @@ class Preprocess:
     '''
     Parent preprocess class for input images.
     '''
-    def _gaussianFilter(self, img, win_size=(3,3), sigma=5):
+    def _gaussian_filter(self, img, win_size=(3,3), sigma=5):
         '''
         Gaussian filtering.\n
         img: np.array\n
@@ -18,22 +18,22 @@ class Preprocess:
         '''
         return cv.GaussianBlur(img, win_size, sigma)
     
-    def _bilateralFilter(self, img, sigma=15):
+    def _bilateral_filter(self, img, sigma=15):
         '''
         Bilateral filtering.\n
         img: np.array\n
         return: np.array
         '''
-        return cv._bilateralFilter(img, 0, sigma, sigma)
+        return cv._bilateral_filter(img, 0, sigma, sigma)
     
-    def _getFeature(self, img, feature_type=0):
+    def _get_feature(self, img, feature_type=0):
         '''
         Get features from give image.\n
         img: np.array\n
         feature_type: int, 0:ORB, 1:SIFT, 2:FAST+ORB descriptor\n
         return: keypoints, descriptor
         '''
-        img = self._gaussianFilter(img)
+        img = self._gaussian_filter(img)
         if feature_type == 0:
             # ORB
             orb = cv.ORB_create()
@@ -55,13 +55,13 @@ class Preprocess:
             print('Wrong feature type code!')
             return None
     
-    def _testDrawFeatures(self, img):
+    def _test_draw_features(self, img):
         '''
         Build-in test function for feature extraction.\n
         img: np.array
         '''
-        gimg = self._gaussianFilter(img)
-        kp, _ = self._getFeature(gimg, 0)
+        gimg = self._gaussian_filter(img)
+        kp, _ = self._get_feature(gimg, 0)
         out = None
         out = cv.drawKeypoints(img, kp, out, color=(0,0,255))
         cv.imshow('test_draw_features', out)
@@ -100,18 +100,18 @@ class AngleProcess(Preprocess):
         Correct the given image into standard reference.\n
         img: np.array, input image\n
         standard_img: np.array, input reference image\n
-        feature_type: int, see _getFeature() for details\n
+        feature_type: int, see _get_feature() for details\n
         return: np.array, np.array, fixed image and transformation matrix
         '''
         # Smoothing
         gimg = cv.cvtColor(img, cv.COLOR_BGR2GRAY)
         gstd = cv.cvtColor(standard_img, cv.COLOR_BGR2GRAY)
-        gimg = self._gaussianFilter(gimg, (3, 3), 5)
-        gstd = self._gaussianFilter(gstd, (3, 3), 5)
+        gimg = self._gaussian_filter(gimg, (3, 3), 5)
+        gstd = self._gaussian_filter(gstd, (3, 3), 5)
 
         # Get features
-        kp, des = super()._getFeature(gimg, feature_type)
-        s_kp, s_des = super()._getFeature(gstd, feature_type)
+        kp, des = super()._get_feature(gimg, feature_type)
+        s_kp, s_des = super()._get_feature(gstd, feature_type)
 
         # Matching
         H = self._match(kp, s_kp, des, s_des)
@@ -123,7 +123,7 @@ class LightProcess(Preprocess):
     '''
     Child class for light preprocessing.
     '''
-    def homomorphicFilter(self, img, rh=1.5, rl=0.9, c=1, n=1, m=3, d0=None):
+    def homomorphic_filter(self, img, rh=1.5, rl=0.9, c=1, n=1, m=3, d0=None):
         '''
         Homomorphic filtering.\n
         img: np.array\n
@@ -157,10 +157,10 @@ class LightProcess(Preprocess):
 
 # Test code
 if __name__ == "__main__":
-    standard_img = cv.imread('../../images/original/2.26_box_standard2.JPG', 1)
+    standard_img = cv.imread('../../images/original/3.13_standard2.JPG', 1)
     # img = cv.imread('../../images/original/2.26_box_left.JPG', 1)
     # img = cv.imread('../../images/original/2.26_box_right.JPG', 1)
-    img = cv.imread('../../images/original/2.26_box_right2.JPG', 1)
+    img = cv.imread('../../images/original/3.13_box2.JPG', 1)
     # img = cv.imread('../../images/original/2.26_box_leftup.JPG', 1)
 
     p = AngleProcess()
@@ -171,4 +171,4 @@ if __name__ == "__main__":
     cv.waitKey()
     cv.destroyAllWindows()
     
-    cv.imwrite('2.26_fixed_box_right2.png', out)
+    # cv.imwrite('2.26_fixed_box_right2.png', out)
