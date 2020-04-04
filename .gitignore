@@ -3,7 +3,10 @@ materials
 references
 开题
 images
+keras-yolo3
 codes/playground/*.jpg
 codes/playground/*.png
 codes/py_codes/*.jpg
 codes/py_codes/*.png
+*.tar
+*.gz
