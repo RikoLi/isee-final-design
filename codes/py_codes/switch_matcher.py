@@ -4,38 +4,43 @@ import matplotlib.pyplot as plt # for test
 
 class SwitchMatcher:
     '''
-    SwitchMatch is used to find the best-matched switch ROIs in given proposals.\n
-    @
+    SwitchMatch is used to find the best-matched switch ROIs in given proposals.
+
+    @template_path:
+        str, path of template image.
+    @proposals:
+        list, ROI proposals of possible switch area.
     '''
     def __init__(self, template_path, proposals):
-        self.template = self._load_template(template_path)
-        self.proposals = proposals
+        self._template = self._load_template(template_path)
+        self._proposals = proposals
 
     def _load_template(self, template_path):
         '''
-        Load template for a SwitchMatch instance.\n
+        Load template for a SwitchMatch instance.
+
         @template_path:
-            str, template image path
+            str, template image path.
         @return:
-            np.array, template image
+            np.array, template image.
         '''
         template = cv.imread(template_path, 1)
         return template
     
     def _get_loss_l2(self, img):
         '''
-        Compute L2-loss between given image and template.\n
+        Compute L2-loss between given image and template.
+
         @img:
-            np.array, input image
+            np.array, input image.
         @return:
-            float, L2-loss between given image and template
+            float, L2-loss between given image and template.
         '''
-        img = cv.GaussianBlur(img, (3,3), 5) # smoothing
-        img = cv.resize(img, (self.template.shape[1], self.template.shape[0])) # align in size
+        img = cv.resize(img, (self._template.shape[1], self._template.shape[0])) # align in shape
         
         # vectorization
         img = np.reshape(img, (1,-1))
-        template = np.reshape(self.template, (1,-1))
+        template = np.reshape(self._template, (1,-1))
 
         # normalization
         img = img / 255.0
@@ -63,9 +68,17 @@ class SwitchMatcher:
     def _get_smoothness_single(self, roi):
         return 1 / (1 + self._get_variance_single(roi))
 
-    def _get_ncc_similarity_single(self, roi):
+    def _get_ncc_similarity(self, roi):
+        '''
+        Compute NCC similarity with given ROI and template.
+
+        @roi:
+            np.array, input ROI.
+        @return:
+            float, NCC similarity between ROI and template.
+        '''
         # smoothing
-        template = cv.GaussianBlur(self.template, (3,3), 1)
+        template = cv.GaussianBlur(self._template, (3,3), 1)
 
         # align in shape
         roi = cv.resize(roi, (template.shape[1], template.shape[0]))
@@ -78,21 +91,22 @@ class SwitchMatcher:
         numerator = np.sum(np.multiply(template, roi))
         denominator = np.sqrt(np.sum(np.square(template))) * np.sqrt(np.sum(np.square(roi)))
 
-        # return numerator / denominator
-        return denominator / numerator # loss version
+        # return numerator / denominator # similarity mode
+        return denominator / numerator # loss mode
 
     def match(self):
         '''
-        Match for the most possible switch ROI in proposals.\n
+        Match for the most possible switch ROI in proposals.
+
         @return:
-            list[dict], list of match results, in loss-ascending order
+            list[dict], list of match results, in loss-ascending order.
         '''
-        if len(self.proposals) == 0:
+        if len(self._proposals) == 0:
             return []
         loss_maps = []
-        for i, roi in enumerate(self.proposals):
+        for i, roi in enumerate(self._proposals):
             # loss_maps.append({'loss': self._get_loss_l2(roi), 'id': i})
-            loss_maps.append({'loss': self._get_ncc_similarity_single(roi), 'id': i})
+            loss_maps.append({'loss': self._get_ncc_similarity(roi), 'id': i})
         sorted_loss_maps = sorted(loss_maps, key=lambda loss_map: loss_map['loss'])
         return sorted_loss_maps
         
