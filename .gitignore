@@ -4,9 +4,13 @@ references
 开题
 images
 keras-yolo3
+4.4_test_result
+rois
+logs
 codes/playground/*.jpg
 codes/playground/*.png
 codes/py_codes/*.jpg
 codes/py_codes/*.png
 *.tar
 *.gz
+*.zip
