@@ -37,7 +37,7 @@ def registrate(paths, start_id):
 def detection_test(paths):
     cols, rows = 768, 1024
     n_correct = 0
-    for path in paths:
+    for idx, path in enumerate(paths):
         location = path.split('_')[-1]
         location = location.split('.')[0]
 
@@ -52,8 +52,9 @@ def detection_test(paths):
         elif location == 'r':
             img = img[int(rows/3):int(rows/3*2)+1, int(cols/4*3):]
 
-        roi, boxes = detector.detect_switch_roi(img)
+        roi, boxes = detector.detect(img)
         real_boxes = detector.check_boxes(boxes)
+
 
         proposals = detector.get_proposals(roi, real_boxes)
         matcher = SwitchMatcher(HOME_PATH+'/images/original/2.26_template.jpg', proposals)
@@ -65,13 +66,17 @@ def detection_test(paths):
         best_match_id = loss_maps[0]['id']
         print('Min loss: {}'.format(loss_maps[0]['loss']))
 
-        roi_with_box = detector.draw_bounding_box(roi, [real_boxes[best_match_id]])
+        roi = detector.draw_bounding_box(roi, boxes, (255,0,0)) # draw all boxes
+        roi_with_box = detector.draw_bounding_box(roi, [real_boxes[best_match_id]]) # draw best matched
         cv.imshow('detection_result', roi_with_box)
         key = cv.waitKey(0)
         if key == ord('t'):
             n_correct += 1
         elif key == ord('f'):
             pass
+        elif key == ord('s'):
+            cv.imwrite('switch_test_{}.png'.format(idx), roi_with_box)
+            print('image saved')
         else:
             print('Wrong key code!')
             quit()
@@ -79,13 +84,13 @@ def detection_test(paths):
     print('----------- Test result -----------')
     print('Total test samples: {}'.format(len(paths)))
     print('Detected: {}'.format(n_correct))
-    print('Correctness rate: {}'.format(n_correct/len(paths)))
+    print('Recall rate: {}'.format(n_correct/len(paths)))
 
 def main():
     paths = os.listdir(HOME_PATH+'/images/switch_test/')
     paths = [HOME_PATH+'/images/switch_test/'+p for p in paths]
 
-    # registrate(paths, 38) # loaction registration
+    # registrate(paths, 64) # location registration
     detection_test(paths)
     
 
