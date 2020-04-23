@@ -13,5 +13,21 @@ def batch_resize(folder_path, save_path, dst_size=(600,800)):
         print('{}/{} is resized to {}, current {}, total {}'.format(folder_path, name, dst_size, i+1, len(img_names)))
     print('Done!')
 
+def get_points(binary):
+    '''
+    Get coordinates of each positive pixel in a binary image.
+
+    @binary:
+        np.array, input binary image.
+    @return:
+        np.array, list of coordinates.
+    '''
+    points = []
+    for i in range(binary.shape[0]):
+        for j in range(binary.shape[1]):
+            if binary[i, j] != 0:
+                points.append([j, i])
+    return np.array(points)
+
 if __name__ == "__main__":
-    batch_resize('../../images/valves/3.17', '../../images/resized_valves/3.17', (600,800))
+    batch_resize('../../images/valves/3.20', '../../images/resized_valves/3.20', (600,800))
