@@ -1,5 +1,5 @@
 '''
-Definition of valve detector class and implementation.
+Definition of valve detector class.
 '''
 import numpy as np
 import cv2.cv2 as cv
@@ -53,10 +53,25 @@ class ValveDetector:
         @img:
             np.array, input image.
         @return:
-            np.array, image in original size.
+            (img, scale_factor), image in original size and scale factors.
         '''
         img = cv.resize(img, (0,0), fx=self._scale_factor[0], fy=self._scale_factor[1], interpolation=cv.INTER_AREA)
-        return img
+        return img, self._scale_factor
+
+    def recover_ellipse(self, param, scale_factor):
+        fx, fy = scale_factor
+        center, axis, angle = param
+        x0, y0 = center
+        short, long = axis
+        x_long_top = x0 + np.cos(angle) * long / 2
+        y_long_top = y0 + np.sin(angle) * long / 2
+        x_short_top = x0 - np.sin(angle) * short / 2
+        y_short_top = y0 + np.cos(angle) * short / 2
+        long_new = np.sqrt(fx**2 * (x0-x_long_top)**2 + fy**2 * (y0-y_long_top)**2) * 2
+        short_new = np.sqrt(fx**2 * (x0-x_short_top)**2 + fy**2 * (y0-y_short_top)**2) * 2
+        if long_new < short_new:
+            angle = angle + 90
+        return ((x0 * fx, y0 * fy), (min(long_new, short_new), max(long_new, short_new)), angle)
 
     def _draw_circles(self, img, circles):
         circles = circles[0]
@@ -254,7 +269,7 @@ class ValveDetector:
         s = cv.Canny(s, max(self._canny_param), min(self._canny_param))
         return s
 
-    def detect_ransac(self, img, outlier_rate=0.4, iterations=1000):
+    def detect_ransac(self, img, outlier_rate=0.4, iterations=1000, draw_ellipse=False):
         '''
         Detect valve center with RANSAC ellipse fitting algorithm.
 
@@ -270,13 +285,24 @@ class ValveDetector:
         '''
         edge = self._get_saturation_edge(img)
         points = self._get_points(edge)
+        
+        # traditional fitting
+        # elps = cv.fitEllipse(points)
+        # center, _, _ = elps
+        # x = int(center[0])
+        # y = int(center[1])
+        # img = cv.ellipse(img, elps, color=(0,255,0), thickness=1)
+        # img = cv.circle(img, (x, y), 2, (0,255,0), cv.FILLED)
+
+        # ransac
         ellipse = self._fit_ellipse_ransac(points, outlier_rate, iterations)
         center, params, _ = ellipse
         x = int(center[0])
         y = int(center[1])
-        img = cv.ellipse(img, ellipse, color=(0,255,255), thickness=2)
-        img = cv.circle(img, (x, y), 2, (0,255,255), cv.FILLED)
-        print('ratio of axis(short/long):{0:.3f}'.format(params[0]/params[1]))
+        if draw_ellipse:
+            img = cv.ellipse(img, ellipse, color=(0,255,255), thickness=1)
+            img = cv.circle(img, (x, y), 2, (0,255,255), cv.FILLED)
+        # print('ratio of axis(short/long):{0:.3f}'.format(params[0]/params[1]))
         return img, ellipse
 
 if __name__ == "__main__":
@@ -284,16 +310,22 @@ if __name__ == "__main__":
     img_names = os.listdir(img_folder)
     img_paths = [os.path.join(img_folder, name) for name in img_names]
     for i in range(len(img_paths)):
-        img = cv.imread(img_paths[i+9], 1)
+        img = cv.imread(img_paths[i+2], 1)
         d = ValveDetector()
         scaled = d.down_scale(img, (100,100))
-        print(d._scale_factor)
         # img = cv.resize(img, (100,100))
         scaled, param = d.detect_ransac(scaled, outlier_rate=0.4, iterations=1000)
-        scaled = d.recover_scale(scaled)
+        recovered, factors = d.recover_scale(scaled)
+        # param = d.recover_ellipse(param, factors)
         cv.imshow('result', scaled)
         cv.imshow('raw', img)
-        if cv.waitKey() == ord('n'):
-            cv.destroyAllWindows()
+        cv.imshow('recovered', recovered)
+        key = cv.waitKey()
+        if key == ord('n'):
+            pass
+        elif key == ord('s'):
+            cv.imwrite('test_{}.png'.format(i), recovered)
+            print('image saved')
         else:
             quit()
+        cv.destroyAllWindows()
